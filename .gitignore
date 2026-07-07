@@ -1,0 +1,6 @@
+__pycache__
+.agents
+.venv
+doc
+download
+requirements.txt
