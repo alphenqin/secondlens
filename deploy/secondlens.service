@@ -1,0 +1,17 @@
+[Unit]
+Description=secondlens bucket watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/qin/projects/secondlens
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/qin/projects/secondlens/main.py --config /home/qin/projects/secondlens/config.yaml watch --interval 60 --upload
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/qin/projects/secondlens/logs/systemd.log
+StandardError=append:/home/qin/projects/secondlens/logs/systemd.err.log
+
+[Install]
+WantedBy=multi-user.target

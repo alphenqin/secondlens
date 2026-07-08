@@ -1,0 +1,17 @@
+storage:
+  endpoint: https://oss.wfy.gov110.cn
+  supplier_code: "360"
+  env: dev
+  inbox_bucket:
+  outbox_bucket:
+  aksk_file: doc/360-aksk.txt
+  ca_file: doc/wfy-root-ca.pem
+  verify_tls: true
+
+runtime:
+  data_dir: data
+  max_tasks: 0
+  poll_interval_seconds: 60
+  task_deadline_seconds: 3600
+  upload: false
+  overwrite_local: false

@@ -1,0 +1,121 @@
+# secondlens
+
+secondlens is a command-line worker for the controlled egress intelligence secondary judgment flow described in `RD.md`.
+
+This is not an API service. The runtime shape is:
+
+```text
+README.md
+requirements.txt
+.gitignore
+config.yaml
+main.py
+app/
+  __init__.py
+  config.py              # YAML/env config loading and bucket naming
+  worker.py              # one-shot local/bucket processing
+  scheduler.py           # APScheduler long-running bucket watcher
+  clients/
+    __init__.py
+    api_client.py        # S3-compatible bucket read/write
+    http_client.py       # httpx wrapper for external evidence APIs
+  services/
+    __init__.py
+    task_service.py      # judgment fallback, result JSON, processed state
+  models/
+    __init__.py
+    task.py              # inbox task, alert_message, judgment models
+  utils/
+    __init__.py
+    logger.py            # loguru setup
+logs/
+deploy/
+  secondlens.service     # systemd service template
+tests/
+```
+
+Run a local dry run after placing inbox files under `data/input/YYYYMMDD/{task_id}/`:
+
+```bash
+python3 main.py local
+```
+
+Read from the inbox bucket and write local results only:
+
+```bash
+python3 main.py bucket --prefix 20260707/ --max-tasks 10
+```
+
+Upload generated results to the outbox bucket:
+
+```bash
+python3 main.py bucket --prefix 20260707/ --upload
+```
+
+Keep polling the inbox bucket:
+
+```bash
+python3 main.py watch --interval 60 --upload
+```
+
+Install dependencies:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+Configuration is read from `config.yaml`. You can pass another file with `--config`.
+
+For production, run it with systemd instead of nohup:
+
+```bash
+sudo cp deploy/secondlens.service /etc/systemd/system/secondlens.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now secondlens
+sudo systemctl status secondlens
+```
+
+Logs are written to `logs/secondlens.log`. systemd stdout/stderr logs are written to `logs/systemd.log` and `logs/systemd.err.log`.
+
+For temporary foreground/background testing:
+
+```bash
+nohup python3 main.py watch --interval 60 --upload >> logs/secondlens.log 2>&1 &
+```
+
+The watcher records processed inbox task keys in `data/work/processed_tasks.json`, so a restart will not resubmit the same task.
+
+The watcher also scans rejected result files under:
+
+```text
+YYYYMMDD/rejection_result/assessment_results_{task_id}_{timestamp}.json
+```
+
+When a rejected result is found, secondlens reloads the original task and alert messages for that date/task ID, regenerates the result, validates it, and resubmits when `--upload` is enabled.
+
+Before upload, generated results are validated for required fields, IOC parsing, enum values, UTC ISO 8601 timestamps, confidence/risk values, and minimum evidence-chain completeness. Invalid results are written locally but not uploaded.
+
+Evidence-chain validation includes:
+
+- `sample_behavior`: requires `hash_md5` or `hash_sha256`; when behavior details are provided, the 10-choose-5 baseline is enforced.
+- `source_links`: must contain a valid `http` or `https` URL; URL suffixes like `#...` or `@Version:...` are normalized.
+- `traffic_fragments`: validates `traffic_type`, `traffic_pattern`, and `description`.
+- `phishing_details`: validates brand/system/title evidence and behavior description.
+- `other_evidence`: validates pivoting parent evidence when structured as a mapping.
+
+The field validator uses the category and enum values from the RD attachments:
+
+- `category_v8`
+- `category_v9`
+- `category_new`
+- `base`
+- `generation_method`
+- `status`
+
+Bucket task `LastModified` is tracked as the task receive time. Results are marked as overdue in logs when processing happens after `runtime.task_deadline_seconds`, defaulting to one hour.
+
+If the project is installed, the same entry point is available as:
+
+```bash
+secondlens watch --interval 60 --upload
+```

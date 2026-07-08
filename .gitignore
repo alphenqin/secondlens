@@ -2,5 +2,7 @@ __pycache__
 .agents
 .venv
 doc
-download
-requirements.txt
+data/
+logs/*
+!logs/.gitignore
+*.py[cod]
