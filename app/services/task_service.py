@@ -100,7 +100,6 @@ class TaskService:
                     "alertCount": alert_count,
                     "alertdevCount": alertdev_count,
                     "source": "bucket_alert_message",
-                    "rejection_reason": task.rejection_reason,
                 },
                 ensure_ascii=False,
             ),

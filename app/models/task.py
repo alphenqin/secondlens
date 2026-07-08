@@ -30,7 +30,6 @@ class JudgmentTask:
     date: str
     source_key: str = ""
     alerts: tuple[AlertMessage, ...] = ()
-    rejection_reason: str = ""
     received_at: datetime | None = None
 
     @classmethod
@@ -41,7 +40,6 @@ class JudgmentTask:
         date: str = "",
         source_key: str = "",
         alerts: tuple[AlertMessage, ...] = (),
-        rejection_reason: str = "",
         received_at: datetime | None = None,
     ) -> "JudgmentTask":
         return cls(
@@ -50,7 +48,6 @@ class JudgmentTask:
             date=date,
             source_key=source_key,
             alerts=alerts,
-            rejection_reason=rejection_reason,
             received_at=received_at,
         )
 

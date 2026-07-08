@@ -31,16 +31,6 @@ class Scheduler:
             coalesce=True,
             replace_existing=True,
         )
-        scheduler.add_job(
-            self.run_rejections_once,
-            "interval",
-            seconds=sleep_seconds,
-            kwargs={"prefix": prefix},
-            id="scan_rejection_results",
-            max_instances=1,
-            coalesce=True,
-            replace_existing=True,
-        )
         self.logger.info(
             "watching inbox={} prefix={!r} interval={}s upload={}",
             self.config.storage.inbox_name,
@@ -49,7 +39,6 @@ class Scheduler:
             self.config.runtime.upload,
         )
         self.run_once(prefix=prefix)
-        self.run_rejections_once(prefix=prefix)
         try:
             scheduler.start()
         except KeyboardInterrupt:
@@ -61,15 +50,6 @@ class Scheduler:
             log_run_result(processed, self.logger)
         except Exception:
             self.logger.exception("scheduled bucket scan failed")
-
-    def run_rejections_once(self, *, prefix: str = "") -> None:
-        try:
-            processed = self.worker.run_rejections(prefix=prefix, state_store=self.state_store)
-            if processed:
-                self.logger.info("processed rejected tasks")
-            log_run_result(processed, self.logger)
-        except Exception:
-            self.logger.exception("scheduled rejection scan failed")
 
 
 def print_run_result(processed) -> None:
