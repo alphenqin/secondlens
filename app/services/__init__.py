@@ -1,5 +1,5 @@
 from app.services.intellens_service import IntellensService
 from app.services.task_service import ProcessedTaskStore, TaskService
-from app.services.wfy_status_service import WfyStatusService
+from app.services.wfy_service import WfyService
 
-__all__ = ["IntellensService", "ProcessedTaskStore", "TaskService", "WfyStatusService"]
+__all__ = ["IntellensService", "ProcessedTaskStore", "TaskService", "WfyService"]

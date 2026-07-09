@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from app.models import Judgment, JudgmentTask
 from app.services.intellens_service import IntellensService
+from app.services.wfy_service import WfyService
 from app.standards import (
     BASES,
     CATEGORY_NEW_CODES,
@@ -18,7 +19,6 @@ from app.standards import (
     CATEGORY_V9_CODES,
     GENERATION_METHODS,
     MALICIOUS_STAMPS,
-    PHISHING_CATEGORY_CODES,
     STATUSES,
 )
 
@@ -48,8 +48,8 @@ class ParsedIoc:
     raw: str
     host: str
     port: int
-    uri: str
-    protocol: str
+    uri: str | None
+    protocol: str | None
     ioc_type: str
 
 
@@ -88,25 +88,46 @@ class ProcessedTaskStore:
 
 
 class TaskService:
-    def __init__(self, intellens_service: IntellensService | None = None):
+    def __init__(self, intellens_service: IntellensService | None = None, wfy_service: WfyService | None = None):
         self.intellens_service = intellens_service or IntellensService()
+        self.wfy_service = wfy_service or WfyService()
 
     def judge(self, task: JudgmentTask) -> Judgment:
         intel = self.intellens_service.judge_one(task.ioc)
+        wfy_fields = self.wfy_service.result_fields_for_ioc(task.ioc)
+        judge = wfy_fields.get("judge", "")
         return Judgment(
-            ops=intel.ops,
-            confidence=intel.confidence,
-            risk_level=intel.risk_level,
-            malicious_stamp=intel.malicious_stamp,
-            status=intel.status,
-            base=intel.base,
-            generation_method=intel.generation_method,
-            category_v8=intel.category_v8,
-            category_v9=intel.category_v9,
-            category_new=intel.category_new,
+            ops=ops_from_wfy_judge(judge),
+            confidence=wfy_fields.get("confidence"),
+            risk_level=wfy_fields.get("risk_level"),
+            malicious_stamp="",
+            status=wfy_fields.get("status", ""),
+            base=wfy_fields.get("base", ""),
+            generation_method="",
+            category_v8=wfy_fields.get("category_v8"),
+            category_v9=wfy_fields.get("category_v9"),
+            category_new=wfy_fields.get("category_new"),
+            tpd=wfy_fields.get("tpd"),
+            first_seen=wfy_fields.get("first_seen", ""),
             evidence=intel.evidence,
-            file_hash=intel.file_hash,
-            tags=intel.tags,
+            control_type="",
+            file_hash=[],
+            last_seen="",
+            created_time=None,
+            modified_time=None,
+            campaign=None,
+            malicious_family=[],
+            platform=[],
+            tags=[],
+            ttps=[],
+            scene=wfy_fields.get("scene"),
+            whois=wfy_fields.get("whois"),
+            icp=wfy_fields.get("icp"),
+            dns=wfy_fields.get("dns"),
+            open_port=wfy_fields.get("open_port"),
+            geo=wfy_fields.get("geo", []),
+            dynamic_domain=wfy_fields.get("dynamic_domain"),
+            certificate=wfy_fields.get("certificate"),
         )
 
     def build_result_payload(self, task: JudgmentTask, judgment: Judgment) -> dict[str, Any]:
@@ -123,19 +144,32 @@ class TaskService:
             "status": judgment.status,
             "base": judgment.base,
             "generation_method": judgment.generation_method,
-            "tpd": None,
+            "tpd": judgment.tpd,
             "category_v8": judgment.category_v8,
             "category_v9": judgment.category_v9,
             "category_new": judgment.category_new,
-            "first_seen": "",
-            "last_seen": "",
-            "created_time": None,
-            "modified_time": None,
+            "first_seen": judgment.first_seen,
             "confidence": judgment.confidence,
             "risk_level": judgment.risk_level,
+            "control_type": judgment.control_type,
             "file_hash": judgment.file_hash,
+            "last_seen": judgment.last_seen,
+            "created_time": judgment.created_time,
+            "modified_time": judgment.modified_time,
+            "campaign": judgment.campaign,
+            "malicious_family": judgment.malicious_family,
+            "platform": judgment.platform,
             "tags": judgment.tags,
+            "ttps": judgment.ttps,
             "evidence": judgment.evidence,
+            "scene": judgment.scene,
+            "whois": judgment.whois,
+            "icp": judgment.icp,
+            "dns": judgment.dns,
+            "open_port": judgment.open_port,
+            "geo": judgment.geo,
+            "dynamic_domain": judgment.dynamic_domain,
+            "certificate": judgment.certificate,
         }
 
     def validate_result_payload(self, payload: dict[str, Any]) -> list[str]:
@@ -238,20 +272,24 @@ def parse_ioc(value: object) -> ParsedIoc:
         if 1 <= port <= 65535:
             try:
                 ipaddress.ip_address(host)
-                return ParsedIoc(text, host, port, "", "", "ip")
+                return ParsedIoc(text, host, port, None, None, "ip")
             except ValueError:
                 if DOMAIN_RE.fullmatch(host):
-                    return ParsedIoc(text, host, port, "", "", "domain")
+                    return ParsedIoc(text, host, port, None, None, "domain")
 
     try:
         ipaddress.ip_address(text)
-        return ParsedIoc(text, text, 0, "", "", "ip")
+        return ParsedIoc(text, text, 0, None, None, "ip")
     except ValueError:
         pass
 
     if DOMAIN_RE.fullmatch(text):
-        return ParsedIoc(text, text, 0, "", "", "domain")
-    return ParsedIoc(text, text, 0, "", "", "unknown")
+        return ParsedIoc(text, text, 0, None, None, "domain")
+    return ParsedIoc(text, text, 0, None, None, "unknown")
+
+
+def ops_from_wfy_judge(judge: str) -> str:
+    return "+" if str(judge or "").strip().lower() == "black" else "-"
 
 
 def utc_now_iso() -> str:
@@ -298,16 +336,6 @@ def validate_evidence(evidence: dict[str, Any], base: str, category_new: int) ->
     if "manual_analysis" in evidence and evidence.get("manual_analysis") != 1:
         errors.append("manual_analysis must be 1 when present")
         return errors
-
-    if base == "sample" and not has_value(evidence.get("sample_behavior")):
-        errors.append("sample_behavior is required when base=sample")
-    if base in {"public", "authority", "vendor"} and not has_value(evidence.get("source_links")):
-        errors.append("source_links is required when base is public/authority/vendor")
-    if category_new in PHISHING_CATEGORY_CODES and not has_value(evidence.get("phishing_details")):
-        # RD marks phishing_details required for phishing Trojan delivery / credential theft.
-        # The fallback category currently uses 100005, so manual_analysis is accepted as a transitional substitute.
-        if evidence.get("manual_analysis") != 1:
-            errors.append("phishing_details is required for phishing categories unless manual_analysis=1")
 
     sample_behavior = evidence.get("sample_behavior")
     if isinstance(sample_behavior, dict):

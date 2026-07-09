@@ -13,5 +13,5 @@ runtime:
   max_tasks: 0
   poll_interval_seconds: 60
   task_deadline_seconds: 3600
-  upload: false
+  upload: true
   overwrite_local: false

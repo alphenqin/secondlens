@@ -64,9 +64,27 @@ class Judgment:
     category_v8: int | None
     category_v9: int | None
     category_new: int | None
+    tpd: bool | None = None
+    first_seen: str = ""
     evidence: dict[str, Any] = field(default_factory=dict)
+    control_type: str = ""
     file_hash: list[str] = field(default_factory=list)
+    last_seen: str = ""
+    created_time: str | None = None
+    modified_time: str | None = None
+    campaign: str | None = None
+    malicious_family: list[str] = field(default_factory=list)
+    platform: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    ttps: list[str] = field(default_factory=list)
+    scene: int | None = None
+    whois: dict[str, Any] | None = None
+    icp: Any = None
+    dns: list[str] | None = None
+    open_port: list[int] | None = None
+    geo: list[str] = field(default_factory=list)
+    dynamic_domain: bool | None = None
+    certificate: str | None = None
 
 
 @dataclass(frozen=True)

@@ -12,7 +12,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="secondlens bucket secondary judgment worker")
     parser.add_argument("--config", default="config.yaml", help="YAML config file path")
     parser.add_argument("--max-tasks", type=int, help="Limit tasks in this run")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command")
 
     local_parser = subparsers.add_parser("local", help="Process downloaded inbox files under data/input")
     local_parser.add_argument("--source-dir", default="", help="Override local inbox directory")
@@ -37,11 +37,15 @@ def main() -> None:
         config = with_runtime_overrides(config, upload=True)
 
     worker = Worker(config)
-    if args.command == "local":
+    command = args.command or "watch"
+
+    if command == "local":
         source_dir = Path(args.source_dir) if args.source_dir else None
         processed = worker.run_local(source_dir)
-    elif args.command == "watch":
-        Scheduler(config, worker=worker).watch(prefix=args.prefix, interval=args.interval or None)
+    elif command == "watch":
+        prefix = getattr(args, "prefix", "")
+        interval = getattr(args, "interval", 0)
+        Scheduler(config, worker=worker).watch(prefix=prefix, interval=interval or None)
         return
     else:
         processed = worker.run_bucket(prefix=args.prefix)

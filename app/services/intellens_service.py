@@ -10,7 +10,6 @@ from app.intellens.decision import clean_report_url, pick_first_report
 from app.intellens.models import AiInfo, ExternalIocInfo, HashInfo, RowDecision, WdInfo, XmonInfo
 from app.intellens.pipeline import run_decision_pipeline
 from app.intellens.utils import normalize_cell
-from app.services.wfy_status_service import WfyStatusService
 
 
 CVE_RE = re.compile(r"\bCVE-\d{4}-\d{4,7}\b", re.IGNORECASE)
@@ -18,19 +17,7 @@ CVE_RE = re.compile(r"\bCVE-\d{4}-\d{4,7}\b", re.IGNORECASE)
 
 @dataclass(frozen=True)
 class IntelLensJudgment:
-    ops: str = "+"
-    confidence: int | None = None
-    risk_level: int | None = None
-    malicious_stamp: str = ""
-    status: str = ""
-    base: str = ""
-    generation_method: str = ""
-    category_v8: int | None = None
-    category_v9: int | None = None
-    category_new: int | None = None
     evidence: dict[str, Any] = field(default_factory=dict)
-    file_hash: list[str] = field(default_factory=list)
-    tags: list[str] = field(default_factory=list)
 
 
 class IntellensService:
@@ -43,25 +30,7 @@ class IntellensService:
 
 
 def build_judgment_from_pipeline(ioc: str, decision: RowDecision, result: Any) -> IntelLensJudgment:
-    evidence = build_evidence_from_pipeline(ioc, decision, result)
-    file_hashes = [decision.file_hash] if normalize_cell(decision.file_hash) else []
-    tags = [value for value in (decision.hit_rule, decision.owner) if normalize_cell(value)]
-    status = WfyStatusService().status_from_wfy_info(result.wfy_map.get(ioc, {}))
-    return IntelLensJudgment(
-        ops="-" if decision.k01_result == "误报" else "+",
-        confidence=3 if decision.k01_result == "有效" else None,
-        risk_level=3 if decision.k01_result == "有效" else None,
-        malicious_stamp="white" if decision.k01_result == "误报" else ("black" if decision.k01_result == "有效" else ""),
-        status=status,
-        base=map_base(decision),
-        generation_method="analyst" if decision.k01_result else "",
-        category_v8=100 if decision.k01_result == "有效" else None,
-        category_v9=10300 if decision.k01_result == "有效" else None,
-        category_new=100000 if decision.k01_result == "有效" else None,
-        evidence=evidence,
-        file_hash=file_hashes,
-        tags=tags,
-    )
+    return IntelLensJudgment(evidence=build_evidence_from_pipeline(ioc, decision, result))
 
 
 def empty_evidence() -> dict[str, Any]:
