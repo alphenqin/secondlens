@@ -1,0 +1,82 @@
+external_services:
+  xmon:
+    base_url: "http://xmon.netlab.qihoo.net/api/iocmon-search/ioc/"
+    query: "?ui_simple=true&pretick=false&model=false&trace=true&keep_no=false&inspect=true&other_source=false"
+    tagmon_base_url: "http://xmon.netlab.qihoo.net/api/tagmon-search/ioc/"
+    tagmon_suffix: "/limit/1000/?data_only=true"
+    token: "6189ff22-21c8-49ab-8519-7ef85f396954"
+    cookie: ""
+  hash:
+    api_url: "https://api.ti.360.cn/v2/file"
+    api_key: "8d5ae25afc18d812a51cc1048b7ef57d"
+    salt: "fc05b3246ed550cc0da9748e7002d676"
+  wfy:
+    api_url: "http://api.netlab.360.com/wfy/reputation/v2"
+  wd:
+    safe_api_url: "http://api.safe.qihoo.net/urls/std/v1/cloud_safe_info"
+    safe_appid: "8caf5d038722624364c0"
+    safe_secret: "2efeec4e0c3d9649629663174c91d7f8f565a6c8"
+    history_api_url: "http://api.netlab.qihoo.net/urldb/v0/detail/"
+    history_token: "e65cf226-ed6e-4761-b0e7-7a091621afb8"
+    history_start: "2020-05-29 00:00:00"
+  sc:
+    tags_api_url: "https://api.ti.360.net/custom/intelligence/v1/tags"
+    default_category: "domain"
+  ai:
+    quick_analysis_url: "http://api.netlab.qihoo.net/ai/quick-analysis"
+  external:
+    wb_ioc_search_url: "http://api.netlab.qihoo.net/external-wb-ioc-search/batch"
+    qax_ioc_search_url: "http://api.netlab.qihoo.net/external-q-ioc-search"
+  llm:
+    api_url: "https://api.360.cn/v1/chat/completions"
+    model: "deepseek/deepseek-v4-flash-internal"
+    token: "fk3631605771.Jh8vxBCKY9nGWVCyrAQIRD9eNC5vVVRFfef19530"
+    summary_max_tokens: 2000
+
+performance:
+  request_timeout: 60                 # 单次 HTTP 请求超时时间，单位秒
+  judge_max_concurrent_requests: 2    # 单个 uvicorn worker 内同时处理的 /judge 请求数
+  judge_queue_timeout_seconds: 60     # 超过入口并发上限后的最长排队等待时间，超时返回服务繁忙
+  http_pool_connections: 100          # requests 连接池保留的连接池数量
+  http_pool_maxsize: 100              # 每个连接池最大连接数，应不小于主要接口并发数
+  xmon_workers: 4                     # xmon 主线索和子线索批次查询并发数
+  xmon_batch_size: 3000               # xmon 主线索每批最多 IOC 数，还会受 URL 长度限制
+  xmon_tagmon_batch_size: 100         # xmon 子线索每批最多 IOC 数
+  xmon_max_url_bytes: 65536           # xmon GET URL 最大字节数，超过会自动拆批
+  xmon_progress_interval: 100         # xmon 每处理多少条 IOC 打印一次进度
+  xmon_tagmon_enabled: true           # 是否查询 xmon 子线索，关闭会更快但会丢失子线索证据
+  xmon_tagmon_retries: 3              # xmon 子线索查询失败后的重试次数
+  xmon_tagmon_retry_sleep: 3.0        # xmon 子线索每次重试前等待秒数
+  hash_workers: 8                     # 文件情报 hash 查询批次并发数
+  hash_batch_size: 10                 # 文件情报每批 hash 数
+  hash_max_batch_size: 10             # 文件情报接口允许的最大批量，用于防止误改超限
+  hash_progress_interval: 200         # hash 查询每处理多少条打印一次进度
+  wfy_workers: 4                      # wfy 批次查询并发数，过高容易触发 429 限流
+  wfy_batch_size: 100                 # wfy 每批 IOC 数
+  wfy_max_batch_size: 100             # wfy 接口允许的最大批量，用于防止误改超限
+  wfy_progress_interval: 100          # wfy 每处理多少条 IOC 打印一次进度
+  wfy_retries: 4                      # wfy 遇到 429 或临时异常时的最大重试次数
+  wfy_retry_sleep_seconds: 2.0        # wfy 重试退避基准秒数，实际按指数退避
+  external_wb_workers: 4              # 外部 wb 接口批次查询并发数
+  external_wb_batch_size: 100         # 外部 wb 接口每批最多 IOC 数
+  external_wb_max_batch_size: 100     # 外部 wb 接口允许的最大批量
+  external_qax_workers: 12            # 外部 qax 接口单 IOC 查询并发数
+  external_progress_interval: 100     # 外部接口证据链每处理多少条 IOC 打印一次进度
+  sc_workers: 12                      # sc 批次查询并发数
+  sc_batch_size: 80                   # sc 每批 IOC 数，payload 中 query.value 用英文逗号拼接
+  sc_progress_interval: 100           # sc 每处理多少条 IOC 打印一次进度
+  wd_workers: 12                      # wd 查询并发数，safe 评分按批次并发，恶意 IOC 再单条查快照
+  wd_safe_batch_size: 20              # wd safe 评分接口每批 IOC 数
+  wd_safe_max_batch_size: 20          # wd safe 评分接口允许的最大批量，第 21 条起可能被接口截断
+  wd_progress_interval: 100           # wd 每处理多少条 IOC 打印一次进度
+  ai_workers: 12                      # 智能体证据链接口并发数，过高容易 500/502/超时
+  ai_progress_interval: 100           # 智能体证据链每处理多少条 IOC 打印一次进度
+  ai_retries: 3                       # 智能体证据链接口失败后的重试次数
+  ai_retry_sleep_seconds: 5.0         # 智能体证据链重试退避基准秒数
+  llm_workers: 12                     # 大模型接口并发数，外部模型接口不宜过高
+  llm_retries: 3                      # 大模型接口失败后的重试次数
+  llm_retry_sleep_seconds: 2.0        # 大模型接口重试等待秒数
+  failed_ioc_reruns: 2                # Excel 批处理异常 IOC 全流程额外重跑轮数
+  sleep_seconds: 0.05                 # 串行分支中每次请求后的短暂停顿，降低接口压力
+  limit: 0                            # 调试用输入行数限制，0 表示不限制
+  xmon_min_severity: 30               # xmon 有效线索最低 severity 阈值，当前规则为 severity > 30

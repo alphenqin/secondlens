@@ -20,8 +20,8 @@ class StorageConfig:
     env: str = "dev"
     inbox_bucket: str | None = None
     outbox_bucket: str | None = None
-    aksk_file: Path = PROJECT_ROOT / "doc" / "360-aksk.txt"
-    ca_file: Path | None = PROJECT_ROOT / "doc" / "wfy-root-ca.pem"
+    aksk_file: Path = PROJECT_ROOT / "secret" / "360-aksk.txt"
+    ca_file: Path | None = PROJECT_ROOT / "secret" / "wfy-root-ca.pem"
     verify_tls: bool = True
 
     @property
@@ -103,8 +103,8 @@ def load_config(path: str | Path | None = None) -> AppConfig:
         env=str(storage_raw.get("env") or "dev"),
         inbox_bucket=storage_raw.get("inbox_bucket"),
         outbox_bucket=storage_raw.get("outbox_bucket"),
-        aksk_file=_as_path(storage_raw.get("aksk_file"), PROJECT_ROOT / "doc" / "360-aksk.txt") or PROJECT_ROOT / "doc" / "360-aksk.txt",
-        ca_file=_as_path(storage_raw.get("ca_file"), PROJECT_ROOT / "doc" / "wfy-root-ca.pem"),
+        aksk_file=_as_path(storage_raw.get("aksk_file"), PROJECT_ROOT / "secret" / "360-aksk.txt") or PROJECT_ROOT / "secret" / "360-aksk.txt",
+        ca_file=_as_path(storage_raw.get("ca_file"), PROJECT_ROOT / "secret" / "wfy-root-ca.pem"),
         verify_tls=str(storage_raw.get("verify_tls", True)).lower() not in {"0", "false", "no"},
     )
     runtime = RuntimeConfig(

@@ -7,3 +7,4 @@ data/
 logs/*
 !logs/.gitignore
 *.py[cod]
+secret/

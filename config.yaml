@@ -4,8 +4,8 @@ storage:
   env: dev
   inbox_bucket:
   outbox_bucket:
-  aksk_file: doc/360-aksk.txt
-  ca_file: doc/wfy-root-ca.pem
+  aksk_file: secret/360-aksk.txt
+  ca_file: secret/wfy-root-ca.pem
   verify_tls: true
 
 runtime:

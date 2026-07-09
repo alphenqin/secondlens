@@ -8,7 +8,7 @@ import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CONFIG_DIR = PROJECT_ROOT / "docs" / "webapi2" / "py3" / "apps" / "intellens" / "config"
+DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config" / "intellens"
 APP_ENV = os.getenv("INTELLENS_ENV") or os.getenv("APP_ENV") or "dev"
 APP_CONFIG_FILE = Path(os.getenv("INTELLENS_CONFIG", DEFAULT_CONFIG_DIR / f"{APP_ENV}.yaml"))
 
