@@ -21,10 +21,13 @@ app/
     http_client.py       # httpx wrapper for external evidence APIs
   services/
     __init__.py
-    task_service.py      # judgment fallback, result JSON, processed state
+    intellens_service.py # IntelLens pipeline to RD result/evidence mapping
+    task_service.py      # result JSON, processed state, IOC parsing
+  intellens/             # ported IntelLens IOC judgment core, no Excel/API/DB layer
+    clients/
   models/
     __init__.py
-    task.py              # inbox task, alert_message, judgment models
+    task.py              # inbox task and judgment models
   utils/
     __init__.py
     logger.py            # loguru setup
@@ -33,6 +36,8 @@ deploy/
   secondlens.service     # systemd service template
 tests/
 ```
+
+`app/intellens/` should stay aligned with the upstream IntelLens judgment core under `docs/webapi2/py3/apps/intellens/`. See `.codex/intellens-sync.md` before changing or updating that code.
 
 Run a local dry run after placing inbox files under `data/input/YYYYMMDD/{task_id}/`:
 

@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.models import Judgment, JudgmentTask
+from app.services.intellens_service import IntellensService
 from app.standards import (
     BASES,
     CATEGORY_NEW_CODES,
@@ -87,41 +88,29 @@ class ProcessedTaskStore:
 
 
 class TaskService:
+    def __init__(self, intellens_service: IntellensService | None = None):
+        self.intellens_service = intellens_service or IntellensService()
+
     def judge(self, task: JudgmentTask) -> Judgment:
-        alert_count = sum(alert.alert_count for alert in task.alerts)
-        alertdev_count = sum(alert.alertdev_count for alert in task.alerts)
-        has_alerts = alert_count > 0 or alertdev_count > 0
-        evidence = {
-            "manual_analysis": 1,
-            "other_evidence": json.dumps(
-                {
-                    "task_id": task.id,
-                    "ioc": task.ioc,
-                    "alertCount": alert_count,
-                    "alertdevCount": alertdev_count,
-                    "source": "bucket_alert_message",
-                },
-                ensure_ascii=False,
-            ),
-        }
+        intel = self.intellens_service.judge_one(task.ioc)
         return Judgment(
-            ops="+" if has_alerts else "-",
-            confidence=1,
-            risk_level=1,
-            malicious_stamp="suspicious" if has_alerts else "white",
-            status="unknown",
-            base="device",
-            generation_method="machine",
-            category_v8=100,
-            category_v9=10300,
-            category_new=100005,
-            evidence=evidence,
-            tags=["bucket-alert"] if has_alerts else ["no-alert-context"],
+            ops=intel.ops,
+            confidence=intel.confidence,
+            risk_level=intel.risk_level,
+            malicious_stamp=intel.malicious_stamp,
+            status=intel.status,
+            base=intel.base,
+            generation_method=intel.generation_method,
+            category_v8=intel.category_v8,
+            category_v9=intel.category_v9,
+            category_new=intel.category_new,
+            evidence=intel.evidence,
+            file_hash=intel.file_hash,
+            tags=intel.tags,
         )
 
     def build_result_payload(self, task: JudgmentTask, judgment: Judgment) -> dict[str, Any]:
         parsed = parse_ioc(task.ioc)
-        now = utc_now_iso()
         return {
             "id": task.id,
             "ops": judgment.ops,
@@ -134,14 +123,14 @@ class TaskService:
             "status": judgment.status,
             "base": judgment.base,
             "generation_method": judgment.generation_method,
-            "tpd": None if parsed.ioc_type == "ip" else False,
+            "tpd": None,
             "category_v8": judgment.category_v8,
             "category_v9": judgment.category_v9,
             "category_new": judgment.category_new,
-            "first_seen": now,
-            "last_seen": now,
-            "created_time": "",
-            "modified_time": "",
+            "first_seen": "",
+            "last_seen": "",
+            "created_time": None,
+            "modified_time": None,
             "confidence": judgment.confidence,
             "risk_level": judgment.risk_level,
             "file_hash": judgment.file_hash,
@@ -159,17 +148,6 @@ class TaskService:
             "ioc_uri",
             "protocol",
             "ioc_type",
-            "malicious_stamp",
-            "status",
-            "base",
-            "generation_method",
-            "category_v8",
-            "category_v9",
-            "category_new",
-            "first_seen",
-            "confidence",
-            "risk_level",
-            "evidence",
         )
         for field in required_fields:
             if field not in payload:
@@ -188,20 +166,20 @@ class TaskService:
                 errors.append("protocol must be http/https for url IOC")
         if not isinstance(payload.get("ioc_port"), int) or payload.get("ioc_port", -1) < 0:
             errors.append("ioc_port must be non-negative int")
-        if payload.get("malicious_stamp") not in MALICIOUS_STAMPS:
+        if has_value(payload.get("malicious_stamp")) and payload.get("malicious_stamp") not in MALICIOUS_STAMPS:
             errors.append("malicious_stamp enum invalid")
-        if payload.get("status") not in STATUSES:
+        if has_value(payload.get("status")) and payload.get("status") not in STATUSES:
             errors.append("status enum invalid")
-        if payload.get("base") not in BASES:
+        if has_value(payload.get("base")) and payload.get("base") not in BASES:
             errors.append("base enum invalid")
-        if payload.get("generation_method") not in GENERATION_METHODS:
+        if has_value(payload.get("generation_method")) and payload.get("generation_method") not in GENERATION_METHODS:
             errors.append("generation_method enum invalid")
         for field in ("category_v8", "category_v9", "category_new", "confidence", "risk_level"):
-            if not isinstance(payload.get(field), int):
+            if has_value(payload.get(field)) and not isinstance(payload.get(field), int):
                 errors.append(f"{field} must be int")
-        if payload.get("confidence") not in {1, 2, 3}:
+        if has_value(payload.get("confidence")) and payload.get("confidence") not in {1, 2, 3}:
             errors.append("confidence must be 1/2/3")
-        if payload.get("risk_level") not in {1, 2, 3}:
+        if has_value(payload.get("risk_level")) and payload.get("risk_level") not in {1, 2, 3}:
             errors.append("risk_level must be 1/2/3")
         if isinstance(payload.get("category_v8"), int) and payload.get("category_v8") not in CATEGORY_V8_CODES:
             errors.append("category_v8 enum invalid")
@@ -215,6 +193,8 @@ class TaskService:
                 errors.append(f"{field} must be UTC ISO 8601")
 
         evidence = payload.get("evidence")
+        if not has_value(evidence):
+            return errors
         if not isinstance(evidence, dict):
             errors.append("evidence must be object")
             return errors
@@ -314,7 +294,10 @@ def validate_evidence(evidence: dict[str, Any], base: str, category_new: int) ->
         "manual_analysis",
     )
     if not any(has_value(evidence.get(field)) for field in evidence_fields):
-        errors.append("at least one evidence field is required")
+        return errors
+    if "manual_analysis" in evidence and evidence.get("manual_analysis") != 1:
+        errors.append("manual_analysis must be 1 when present")
+        return errors
 
     if base == "sample" and not has_value(evidence.get("sample_behavior")):
         errors.append("sample_behavior is required when base=sample")
@@ -330,9 +313,6 @@ def validate_evidence(evidence: dict[str, Any], base: str, category_new: int) ->
     if isinstance(sample_behavior, dict):
         if not (has_value(sample_behavior.get("hash_md5")) or has_value(sample_behavior.get("hash_sha256"))):
             errors.append("sample_behavior requires hash_md5 or hash_sha256")
-        detail_count = sum(1 for field in SAMPLE_BEHAVIOR_DETAIL_FIELDS if has_value(sample_behavior.get(field)))
-        if detail_count and detail_count < 5:
-            errors.append("sample_behavior detail fields should satisfy 10 choose 5 when provided")
         if has_value(sample_behavior.get("behavior_description")) and len(str(sample_behavior.get("behavior_description"))) > 1000:
             errors.append("sample_behavior.behavior_description must be <= 1000 characters")
 
@@ -374,8 +354,6 @@ def validate_evidence(evidence: dict[str, Any], base: str, category_new: int) ->
             errors.append("other_evidence.parent_evidence is required when parent_intelligence is present")
         if has_value(other_evidence.get("parent_intelligence")) and not has_value(other_evidence.get("pivoting_feature")):
             errors.append("other_evidence.pivoting_feature is required when parent_intelligence is present")
-    if "manual_analysis" in evidence and evidence.get("manual_analysis") != 1:
-        errors.append("manual_analysis must be 1 when present")
     return errors
 
 

@@ -55,15 +55,15 @@ class JudgmentTask:
 @dataclass(frozen=True)
 class Judgment:
     ops: str
-    confidence: int
-    risk_level: int
+    confidence: int | None
+    risk_level: int | None
     malicious_stamp: str
     status: str
     base: str
     generation_method: str
-    category_v8: int
-    category_v9: int
-    category_new: int
+    category_v8: int | None
+    category_v9: int | None
+    category_new: int | None
     evidence: dict[str, Any] = field(default_factory=dict)
     file_hash: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
