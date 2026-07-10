@@ -36,10 +36,11 @@ class PipelineState:
     sc_failed_iocs: list[str] = field(default_factory=list)
     wd_failed_iocs: list[str] = field(default_factory=list)
     ai_failed_iocs: list[str] = field(default_factory=list)
+    ai_empty_evidence_iocs: list[str] = field(default_factory=list)
+    ai_filtered_empty_evidence_iocs: list[str] = field(default_factory=list)
     wd_llm_failed_iocs: list[str] = field(default_factory=list)
     atateam_llm_failed_iocs: list[str] = field(default_factory=list)
     atateam_llm_rejected_summaries: list[str] = field(default_factory=list)
     siyubo_llm_failed_iocs: list[str] = field(default_factory=list)
     siyubo_llm_rejected_summaries: list[str] = field(default_factory=list)
     ai_llm_rejected_summaries: list[str] = field(default_factory=list)
-

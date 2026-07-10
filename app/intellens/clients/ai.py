@@ -18,7 +18,7 @@ from app.intellens.clients.llm import (
 )
 
 
-def query_ai_quick_analysis_one(ioc: str) -> AiInfo:
+def query_ai_quick_analysis_one(ioc: str, state: PipelineState | None = None) -> AiInfo:
     payload = {
         "ioc": ioc,
         "ioc_type": "domain",
@@ -49,11 +49,19 @@ def query_ai_quick_analysis_one(ioc: str) -> AiInfo:
     key_evidence = body.get("key_evidence", []) if isinstance(body, dict) else []
     if not isinstance(key_evidence, list):
         key_evidence = []
+    raw_evidence = [normalize_cell(item) for item in key_evidence if normalize_cell(item)]
+    if not raw_evidence:
+        if state is not None:
+            state.ai_empty_evidence_iocs.append(f"{ioc} | quick-analysis 返回 key_evidence 为空")
+        return AiInfo(ioc=ioc)
     filtered = [
-        normalize_cell(item)
-        for item in key_evidence
-        if normalize_cell(item) and not any(term in normalize_cell(item) for term in AI_KEY_EVIDENCE_DROP_TERMS)
+        item
+        for item in raw_evidence
+        if not any(term in item for term in AI_KEY_EVIDENCE_DROP_TERMS)
     ]
+    if not filtered and state is not None:
+        dropped_terms = "、".join(AI_KEY_EVIDENCE_DROP_TERMS)
+        state.ai_filtered_empty_evidence_iocs.append(f"{ioc} | key_evidence 过滤后为空，过滤词：{dropped_terms}，原始证据：{'；'.join(raw_evidence)}")
     return AiInfo(ioc=ioc, key_evidence=filtered)
 
 
@@ -175,7 +183,7 @@ def query_ai_quick_analysis(ioc_list: list[str], state: PipelineState) -> dict[s
     def collect_ai_results(llm_executor: ThreadPoolExecutor | None = None) -> None:
         nonlocal completed
         with ThreadPoolExecutor(max_workers=ai_worker_count) as ai_executor:
-            future_map = {ai_executor.submit(query_ai_quick_analysis_one, ioc): ioc for ioc in unique_iocs}
+            future_map = {ai_executor.submit(query_ai_quick_analysis_one, ioc, state): ioc for ioc in unique_iocs}
             for future in as_completed(future_map):
                 ioc = future_map[future]
                 completed += 1

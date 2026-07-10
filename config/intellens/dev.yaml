@@ -69,11 +69,11 @@ performance:
   wd_safe_batch_size: 20              # wd safe 评分接口每批 IOC 数
   wd_safe_max_batch_size: 20          # wd safe 评分接口允许的最大批量，第 21 条起可能被接口截断
   wd_progress_interval: 100           # wd 每处理多少条 IOC 打印一次进度
-  ai_workers: 12                      # 智能体证据链接口并发数，过高容易 500/502/超时
+  ai_workers: 24                      # 智能体证据链接口并发数，过高容易 500/502/超时
   ai_progress_interval: 100           # 智能体证据链每处理多少条 IOC 打印一次进度
   ai_retries: 3                       # 智能体证据链接口失败后的重试次数
   ai_retry_sleep_seconds: 5.0         # 智能体证据链重试退避基准秒数
-  llm_workers: 12                     # 大模型接口并发数，外部模型接口不宜过高
+  llm_workers: 24                     # 大模型接口并发数，外部模型接口不宜过高
   llm_retries: 3                      # 大模型接口失败后的重试次数
   llm_retry_sleep_seconds: 2.0        # 大模型接口重试等待秒数
   failed_ioc_reruns: 2                # Excel 批处理异常 IOC 全流程额外重跑轮数
